@@ -1,12 +1,49 @@
+import datetime
+from peewee import *
+from dotenv import load_dotenv
+from sys import exit
 from instaloader import Instaloader, Profile
-from os import listdir, unlink
+from os import listdir, unlink, environ
 from os.path import splitext
+
+load_dotenv()
+
+# Initiate DB
+DB_CONN_STRING = environ.get("DB_PATH")
+if not DB_CONN_STRING:
+    exit("Error: Database not found")
+
+DB_CONN_STRING = DB_CONN_STRING + "/app.db"
+db = SqliteDatabase(DB_CONN_STRING)
+
+class BaseModel(Model):
+    class Meta:
+        database = db
+
+class User(BaseModel):
+    username = CharField(primary_key=True)
+    profile_url = CharField()
+
+class Post(BaseModel):
+    user = ForeignKeyField(User, backref='tweets')
+    caption = TextField()
+    created_date = DateTimeField(default=datetime.datetime.now)
+
+class PostMedia(BaseModel):
+    user = ForeignKeyField(User, backref='tweets')
+    message = TextField()
+    created_date = DateTimeField(default=datetime.datetime.now)
+    is_published = BooleanField(default=True)
+
+db.connect()
+db.create_tables([User, Post, PostMedia])
+
 # Get instance
 Archiver = Instaloader()
 
 profile_name = "ttt_official"
 
-profile = Profile.from_username(Archiver.context, profile_name0)
+profile = Profile.from_username(Archiver.context, profile_name)
 
 for post in profile.get_posts():
     print("Got post: https://instagram.com/p/" + post.shortcode)
