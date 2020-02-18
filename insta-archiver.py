@@ -1,5 +1,7 @@
 import datetime
 import json
+import string
+import random
 from pprint import pprint
 from dotenv import load_dotenv
 from sys import exit
@@ -7,10 +9,14 @@ from os import listdir, unlink, environ
 from os.path import splitext
 from peewee import *
 from instaloader import Instaloader, Profile
+from shutil import copy2
 
 load_dotenv()
 
-# Initiate DB
+def random_generator(size=6, chars=string.ascii_lowercase + string.digits):
+    return ''.join(random.choice(chars) for x in range(size))
+
+# Load runtime variables
 DB_CONN_STRING = environ.get("DB_PATH")
 if not DB_CONN_STRING:
     exit("Error: Database not found")
@@ -19,9 +25,18 @@ USERS_LIST_PATH = environ.get("USERS_LIST_PATH")
 if not USERS_LIST_PATH:
     exit("No users provided! Exiting!")
 
+MEDIA_ARCHIVAL_DIRECTORY = environ.get("MEDIA_ARCHIVAL_DIRECTORY")
+if not MEDIA_ARCHIVAL_DIRECTORY:
+    exit("Please provide path to save media!")
+
+# Initiate DB
 DB_CONN_STRING = DB_CONN_STRING + "/app.db"
 db = SqliteDatabase(DB_CONN_STRING)
-Archiver = Instaloader()
+Archiver = Instaloader(
+    download_video_thumbnails = False,
+    download_comments = False,
+    save_metadata = False
+)
 
 class BaseModel(Model):
     class Meta:
@@ -38,8 +53,14 @@ class Post(BaseModel):
     post_url = CharField()
     created_date = DateTimeField(default=datetime.datetime.now)
 
+class PostMedia(BaseModel):
+    media_id = CharField(primary_key=True)
+    post = ForeignKeyField(Post, backref='media')
+    media_type = CharField(constraints=[Check("media_type in ('photo', 'video')")])
+    file_name = CharField()
+
 db.connect()
-db.create_tables([User, Post])
+db.create_tables([User, Post, PostMedia])
 
 def archive_user (profile_name):
     downloadFolderName = "download_data"
@@ -58,21 +79,21 @@ def archive_user (profile_name):
             break
             
         postCaption = ""
+        lstPostMedia = list()
         Archiver.download_post(instaPost, target=downloadFolderName)
         for f in listdir(downloadFolderName):
             file_path = downloadFolderName + '/' + f
-            file_extension = splitext(f)[1]        
+            file_extension = splitext(f)[1]
             if file_extension == ".txt":
                 with open(file_path) as yoF:
                     lines = yoF.read()
                     postCaption = lines
+                unlink(file_path)
             elif file_extension == ".json" or file_extension == ".xz":
                 unlink(file_path)
-                continue
             else:
-                print("Found media: " + f)
-            unlink(file_path)
-
+                lstPostMedia.append(file_path)
+            
         dbPost = Post.create(
             short_code=instaPost.shortcode,
             user=dbUser,
@@ -80,6 +101,23 @@ def archive_user (profile_name):
             post_url="https://instagram.com/p/" + instaPost.shortcode,
             created_date=instaPost.date_utc
         )
+
+        for postMedia in lstPostMedia:
+            file_extension = splitext(postMedia)[1]
+            media_id = dbPost.short_code + '_' + random_generator()
+            newFileName = media_id + file_extension
+            newFilePath = MEDIA_ARCHIVAL_DIRECTORY + '/' + newFileName
+            print(newFilePath)
+            copy2(postMedia, newFilePath)
+            media_type = 'video' if file_extension == '.mp4' else 'photo'
+            PostMedia.create(
+                media_id=media_id,
+                post=dbPost,
+                media_type=media_type,
+                file_name=newFileName
+            )
+            unlink(postMedia)
+        
 
 # Load users to be archived
 usersToArchive = []
