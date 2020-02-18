@@ -2,7 +2,7 @@
 Archive all posts with captions from a account. This service can be run on schedule to archive new posts as well.
 
 ## Run Locally
-This project uses `pipenv` to manage dependencies.
+This project uses `pipenv` to manage dependencies. The script has been tested on python 3.6.
 ```
 > pipenv install
 > pipenv shell
