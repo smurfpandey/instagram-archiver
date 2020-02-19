@@ -52,6 +52,8 @@ class Post(BaseModel):
     caption = TextField()
     post_url = CharField()
     created_date = DateTimeField(default=datetime.datetime.now)
+    likes = IntegerField()
+    comments = IntegerField()
 
 class PostMedia(BaseModel):
     media_id = CharField(primary_key=True)
@@ -99,7 +101,9 @@ def archive_user (profile_name):
             user=dbUser,
             caption=postCaption,
             post_url="https://instagram.com/p/" + instaPost.shortcode,
-            created_date=instaPost.date_utc
+            created_date=instaPost.date_utc,
+            likes=instaPost.likes,
+            comments=instaPost.comments
         )
 
         for postMedia in lstPostMedia:
@@ -107,9 +111,10 @@ def archive_user (profile_name):
             media_id = dbPost.short_code + '_' + random_generator()
             newFileName = media_id + file_extension
             newFilePath = MEDIA_ARCHIVAL_DIRECTORY + '/' + newFileName
-            print(newFilePath)
+            # Copy media to archive folder
             copy2(postMedia, newFilePath)
             media_type = 'video' if file_extension == '.mp4' else 'photo'
+            # Save details in DB
             PostMedia.create(
                 media_id=media_id,
                 post=dbPost,

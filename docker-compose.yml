@@ -1,0 +1,14 @@
+version: '3.2'
+
+services:
+  instagram-archiver:
+    container_name: instagram-archiver
+    image: smurfpandey/instagram-archiver:latest
+    volumes:
+      - ./runtime_data:/data/db
+      - ./runtime_data/users.json:/data/users.json
+      - ./runtime_data/media:/data/media
+    environment:
+      - DB_PATH=/data/db
+      - USERS_LIST_PATH=/data/users.json
+      - MEDIA_ARCHIVAL_DIRECTORY=/data/media
