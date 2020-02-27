@@ -5,7 +5,7 @@ import random
 from pprint import pprint
 from dotenv import load_dotenv
 from sys import exit
-from os import listdir, unlink, environ
+from os import listdir, unlink, environ, makedirs, path
 from os.path import splitext
 from peewee import *
 from instaloader import Instaloader, Profile
@@ -60,6 +60,7 @@ class PostMedia(BaseModel):
     post = ForeignKeyField(Post, backref='media')
     media_type = CharField(constraints=[Check("media_type in ('photo', 'video')")])
     file_name = CharField()
+    file_path = CharField()
 
 db.connect()
 db.create_tables([User, Post, PostMedia])
@@ -72,6 +73,11 @@ def archive_user (profile_name):
         profile_url=profile_url)
 
     profile = Profile.from_username(Archiver.context, dbUser.username)
+
+    # create directory where all media will be stored
+    mediaDirectory = MEDIA_ARCHIVAL_DIRECTORY + '/' + profile_name
+    if not path.exists(mediaDirectory):
+        makedirs(mediaDirectory)
 
     for instaPost in profile.get_posts():
         # Check if we have already archived this post
@@ -110,7 +116,7 @@ def archive_user (profile_name):
             file_extension = splitext(postMedia)[1]
             media_id = dbPost.short_code + '_' + random_generator()
             newFileName = media_id + file_extension
-            newFilePath = MEDIA_ARCHIVAL_DIRECTORY + '/' + newFileName
+            newFilePath = mediaDirectory + '/' + newFileName
             # Copy media to archive folder
             copy2(postMedia, newFilePath)
             media_type = 'video' if file_extension == '.mp4' else 'photo'
@@ -119,7 +125,8 @@ def archive_user (profile_name):
                 media_id=media_id,
                 post=dbPost,
                 media_type=media_type,
-                file_name=newFileName
+                file_name=newFileName,
+                file_path=newFilePath
             )
             unlink(postMedia)
         
